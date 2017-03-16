@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ImageDetailMapper">
+
+	<sql id="imageDetail"> kcqb_image_detail imd </sql>
+	<!-- add by JHONNY begin -->
+	<sql id="image-detail"> kcqb_image_detail</sql>
+	<!-- add by JHONNY end -->
+	
+	<resultMap id="ImageDetailBeanMap" type="ImageDetail">
+		<id column="id" property="id" />   
+		<id column="source_table" property="source_table" />   
+		<id column="source_id" property="source_id" />   
+		<id column="type" property="type" />  
+		<id column="image" property="image" />  
+		<id column="created_at" property="created_at" />  
+		 
+	</resultMap>
+
+	<!-- 列表查询 -->
+  	<select id="ImageDetailList" parameterType="pd" resultMap="ImageDetailBeanMap">
+    	select imd.* 
+    	 from <include refid="imageDetail"/> where imd.source_table=#{source_table} and imd.source_id=#{source_id} and imd.type= #{type}	 
+    	  order by imd.id
+  	</select>
+  	
+  	<!-- add by JHONNY begin -->
+	
+	<!-- 批量删除 -->
+	<delete id="batchDel" parameterType="pd" flushCache="true">
+		DELETE FROM
+			<include refid="image-detail"/>
+		WHERE 
+			source_table = #{source_table} AND type = #{type} AND source_id = #{source_id} AND image IN
+			<foreach collection="delImgNameArr" open="(" close=")" item="imageName" separator=",">#{imageName}</foreach> 
+	</delete>
+	
+	<!-- 批量添加 -->
+	<insert id="batchInsert" parameterType="pd">
+		INSERT INTO 
+			<include refid="image-detail"/>(source_table,source_id,type,image,created_at)
+		VALUES
+			<foreach collection="addImgNameArr" separator="," item="imageName">
+				(#{source_table},#{source_id},#{type},#{imageName},NOW())
+			</foreach>	
+	</insert>
+	
+  	<!-- add by JHONNY end -->
+  	
+  		<!-- 清除指定合同图片 -->
+	<delete id="clear-carsimgs" parameterType="pd" flushCache="true">
+		DELETE FROM <include refid="imageDetail"/> WHERE source_id = #{carsInfoId} 
+		and source_table = #{source_table} and type = #{type} and image in (${imgName});
+	</delete>
+  	  		<!-- 插入 -->
+	<insert id="save" parameterType="pd" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO <include refid="imageDetail"/>
+		(
+			source_table,
+			source_id,
+			type,
+			image,
+			created_at
+	
+		)
+		VALUES
+		(
+			#{source_table},
+			#{source_id},
+			#{type},
+			#{image},
+			#{caretedAt}
+		);
+	</insert>
+</mapper>

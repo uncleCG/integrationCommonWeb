@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+	<entry key="upload">upload.properties</entry>
+	<entry key="phonesms">phonesms.properties</entry>
+	<!-- 
+	<entry key="jpush">jpush.properties</entry>
+	<entry key="weixin">weixin.properties</entry>
+	 -->
+</properties>

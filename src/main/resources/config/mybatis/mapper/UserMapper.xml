@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="UserMapper">
+
+	<sql id="user">kcqb_sys_user</sql>
+	<sql id="role">kcqb_sys_role</sql>
+	<sql id="right">kcqb_sys_right</sql>
+	<sql id="user_role">kcqb_sys_user_role</sql>
+	<sql id="role_right">kcqb_sys_role_right</sql>
+	<sql id="base_column">
+		*
+	</sql>
+	
+	<!-- 映射 User JavaBean基本信息 -->
+	<resultMap type="user" id="userMap">
+		<id column="id" property="id"/>
+		<!-- 在这里处理 column 和 property 的关系，不做特殊处理的直接使用实体类中的property -->
+		<result column="created_at" property="createdAt"/>
+		<result column="updated_at" property="updatedAt"/>
+	</resultMap>
+
+	<!-- 映射 User JavaBean 详细信息（包括角色集合）-->
+	<resultMap type="user" id="detailUserMap">
+		<!-- 在这里处理 column 和 property 的关系，不做特殊处理的直接使用实体类中的property -->
+		<id column="userId" property="id"/>
+		<result column="userName" property="name"/>
+		<result column="userPwd" property="pwd"/>
+		<result column="userNickname" property="nickname"/>
+		<result column="userState" property="state"/>
+		<result column="userMobile" property="mobile"/>
+		<result column="userEmail" property="email"/>
+		<result column="userCreatedAt" property="createdAt"/>
+		<result column="userUpdatedAt" property="updatedAt"/>
+		<result column="portName" property="portName"/>
+		<collection property="roleList" ofType="role" javaType="ArrayList">
+			<id column="roleId" property="id"/>
+			<result column="roleName" property="name"/>
+			<result column="roleDescription" property="description"/>
+		</collection>
+	</resultMap>
+	
+	<!-- 映射Role实体 -->
+	<resultMap type="role" id="roleMap">
+		<id column="id" property="id"/>
+		<result column="name" property="name"/>
+		<result column="description" property="description"/>
+		<collection property="rightList" ofType="right" javaType="ArrayList">
+			<id column="rightId" property="id"/>
+			<result column="rightName" property="name"/>
+			<result column="rightDesc" property="description"/>
+			<result column="rightLink" property="link"/>
+			<result column="rightParentId" property="parentId"/>
+			<result column="rightType" property="type"/>
+			<result column="rightSeqnum" property="seqnum"/>
+			<result column="rightState" property="state"/>
+		</collection>
+	</resultMap>
+	
+	<!-- 翻页获取数据列表 -->
+	<select id="getUserListPage" parameterType="page" resultMap="detailUserMap">
+		SELECT
+			a.id userId,a.name userName, a.pwd userPwd, a.nickname userNickname, a.state userState,
+			a.mobile userMobile, a.email userEmail, a.created_at userCreatedAt, a.updated_at userUpdatedAt,
+			c.id roleId, c.name roleName, c.description roleDescription
+		FROM
+			<include refid="user"/> a, <include refid="user_role"/> b, <include refid="role"/> c
+		<where>
+			 a.id = b.user_id AND b.role_id = c.id
+			<if test="pd.nickname != null and pd.nickname != ''"> AND a.nickname LIKE CONCAT('%',#{pd.nickname},'%')</if>
+		</where>
+		ORDER BY c.id
+	</select>
+	
+	<!-- 添加用户 -->
+	<insert id="insert" parameterType="user" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO <include refid="user"/>(
+			name,pwd,nickname,state,mobile,email,created_at
+		)VALUES(
+			#{name},#{pwd},#{nickname},#{state},#{mobile},#{email},NOW()
+		)
+	</insert>
+	
+	<!-- 更新用户信息 -->
+	<update id="update" parameterType="user" flushCache="true">
+		UPDATE 
+			<include refid="user"/>
+		<set>
+			<if test="name != null and name != ''">name = #{name},</if>
+			<if test="pwd != null and pwd != ''">pwd = #{pwd},</if>
+			<if test="nickname != null and nickname != ''">nickname = #{nickname},</if>
+			<if test="state != null and state != ''">state = #{state},</if>
+			<if test="mobile != null and mobile != ''">mobile = #{mobile},</if>
+			<if test="email != null and email != ''">email = #{email},</if>
+		</set>
+		WHERE
+			id = #{id}
+	</update>
+
+	<!-- 根据id获取详情 -->
+	<select id="getById" parameterType="int" resultMap="detailUserMap">
+		SELECT
+			a.id userId,a.name userName, a.pwd userPwd, a.nickname userNickname, a.state userState,
+			a.mobile userMobile, a.email userEmail, a.created_at userCreatedAt, a.updated_at userUpdatedAt,
+			c.id roleId, c.name roleName
+		FROM
+			<include refid="user"/> a, <include refid="user_role"/> b, <include refid="role"/> c
+		<where>
+			a.id = b.user_id AND b.role_id = c.id AND a.id = #{userId}
+		</where>
+	</select>
+
+	<!-- 根据nickname获取详情 -->
+	<select id="getByNickname" parameterType="string" resultMap="userMap">
+		SELECT 
+			<include refid="base_column"/>
+		FROM
+			<include refid="user" />
+		WHERE 
+			nickname = #{nickname}
+	</select>
+
+	<!-- 根据用户id获取其拥有角色集合 -->
+	<select id="getRoleListByUserId" parameterType="int" resultType="role">
+		SELECT
+			a.role_id id, b.name name, b.description description
+		FROM
+			<include refid="user_role"/> a,<include refid="role"/> b
+		WHERE
+			a.user_id = #{userId} AND a.role_id = b.id
+	</select>
+
+	<!-- 删除指定id用户 -->
+	<delete id="delUserById" parameterType="int" flushCache="true">
+		DELETE FROM <include refid="user"/> WHERE id = #{userId}
+	</delete>
+	
+	<!-- 根据用户id获取其拥有权限集合 -->
+	<select id="getRightListByUserId" parameterType="int" resultType="right">
+		SELECT
+			DISTINCT c.id id, c.name name, c.description description
+		FROM
+			<include refid="user_role"/> a, <include refid="role_right"/> b, <include refid="right"/> c
+		WHERE
+			a.user_id = #{userId} AND a.role_id = b.role_id AND b.right_id = c.id
+	</select>
+	
+	<!-- 查询拥有指定角色的用户数量 -->
+  	<select id="getUserNumByRoleId" parameterType="int" resultType="int">
+  		SELECT COUNT(id) userNum FROM <include refid="user_role"/> WHERE role_id = #{roleId} 
+  	</select>
+
+</mapper>

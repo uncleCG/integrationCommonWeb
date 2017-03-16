@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="RoleRightMapper">
+
+	<sql id="role-right"> kcqb_sys_role_right </sql>
+	<sql id="right"> kcqb_sys_right </sql>
+	
+	<resultMap id="roleRightMap" type="roleRight">
+		<id column="id" property="id"/>
+		<result column="role_id" property="roleId"/>
+		<result column="created_at" property="createdAt"/>
+		<collection property="rightList" javaType="ArrayList" ofType="right">
+			<id column="right_id" property="id"/>
+			<result column="rightName" property="name"/>
+			<result column="link" property="link"/>
+			<result column="description" property="description"/>
+			<result column="parent_id" property="parentId"/>
+			<result column="state" property="state"/>
+			<result column="rightCreatedAt" property="createdAt"/>
+			<result column="rightUpdatedAt" property="updatedAt"/>
+		</collection>
+	</resultMap>
+	
+	<resultMap id="baseBeanMap" type="roleRight">
+		<id column="id" property="id"/>
+		<result column="role_id" property="roleId"/>
+		<result column="right_id" property="rightId"/>
+		<result column="created_at" property="createdAt"/>
+	</resultMap>
+	
+	<!-- 批量插入 -->
+	<insert id="insert" parameterType="pd">
+		INSERT INTO <include refid="role-right"/>  (
+			role_id,right_id,created_at
+		) VALUES
+		<foreach collection="rightIds" item="rightId" separator=",">
+			(#{roleId},#{rightId},NOW())
+		</foreach>
+	</insert>
+	
+	<!-- 查询 -->
+  	<select id="getRightByRoleId" parameterType="int" resultMap="roleRightMap">
+  		SELECT
+			a.id id, a.role_id role_id, a.right_id right_id, a.created_at createdAt,
+			b.name rightName, b.link link, b.description description, b.parnet_id parent_id,
+			b.state state, b.created_at rightCreatedAt, b.updated_at rightUpdatedAt
+  		FROM
+  			<include refid="role-right"/> a, <include refid="right"/> b
+  		WHERE
+  			a.right_id = b.id AND a.role_id = #{roleId}
+  	</select>
+  	
+  	<!-- 获取角色拥有的权限列表 -->
+  	<select id="findAllRightByRoleId" parameterType="int" resultMap="baseBeanMap">
+    	SELECT * FROM <include refid="role-right"/> WHERE role_id = #{roleId}
+  	</select>
+  	
+  	<!-- 删除 -->
+	<delete id="clearByRoleId" parameterType="int" flushCache="true">
+		DELETE FROM <include refid="role-right"/> WHERE role_id = #{roleId}
+	</delete>  	
+  	
+</mapper>

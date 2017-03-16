@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DaqUserMapper">
+
+	<sql id="daq-user">kcqb_daq_user</sql>
+	<sql id="shop-info">kcqb_shop_info</sql>
+	<sql id="daq-relationship">kcqb_daq_relationship</sql>
+	
+	<sql id="base_column">
+		id,mobile,name,created_at,remark,state,updated_at,qrcode_image,qrcode_content,qrcode_time,employee_code,
+		birthday,email,head_image,passwd,position,token,manager_id
+	</sql>
+	
+  	<!-- 动态组装复合查询条件 -->
+	<sql id="page_condition_sql">
+		<if test="pd.state != null and pd.state != '-1'"> AND state = #{pd.state}</if>
+	</sql>
+	
+	<!-- 列表分页查询 -->
+  	<select id="findDaqUserListPage" parameterType="page" resultType="pd">
+    	SELECT
+    		<include refid="base_column"/>,
+    		(SELECT COUNT(id) FROM <include refid="shop-info"/> b WHERE b.follow_daq_id = a.id AND b.sign_status &gt;-2) signShopNum,
+    		(SELECT COUNT(id) FROM <include refid="shop-info"/> c WHERE c.follow_daq_id = a.id) followShopNum
+    	FROM 
+    		<include refid="daq-user"/> a
+    	<where>
+    		<include refid="page_condition_sql"/>
+    	</where> 
+  	</select>
+  	
+  	<!-- 根据id获取人员详情 -->
+  	<select id="getDaqUserDetailById" parameterType="string" resultType="pd">
+  		SELECT
+  			<include refid="base_column"/>
+  		FROM
+  			<include refid="daq-user"/>
+  		WHERE
+  			id = #{daqUserId}
+  	</select>
+
+  	<!-- 插入 -->
+	<insert id="save" parameterType="pd" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO <include refid="daq-user"/>
+		(
+			mobile,
+			name,
+			created_at,
+			remark,
+			state,
+			updated_at,
+			qrcode_content,
+			qrcode_time,
+			employee_code,
+			birthday,
+			email,
+			head_image,
+			passwd,
+			position,
+			manager_id
+		)
+		VALUES
+		(
+			#{mobile},
+			#{name},
+			NOW(),
+			#{remark},
+			#{state},
+			NOW(),
+			#{qrcode_content},
+			#{qrcode_time},
+			#{employee_code},
+			#{birthday},
+			#{email},
+			#{head_image},
+			#{passwd},
+			#{position},
+			#{manager_id}
+		)
+	</insert>
+	
+	<!-- 更新 -->
+	<update id="update" parameterType="pd" flushCache="true">
+		UPDATE 
+			<include refid="daq-user"/>
+		<set>
+			updated_at = NOW(),
+			<if test="mobile != null and mobile != ''"> mobile = #{mobile},</if>
+			<if test="name != null and name != ''"> name = #{name},</if>
+			<if test="remark != null and remark != ''"> remark = #{mobiremarkle},</if>
+			<if test="state != null and state != ''"> state = #{state},</if>
+			<if test="qrcode_content != null and qrcode_content != ''"> qrcode_content = #{qrcode_content},</if>
+			<if test="qrcode_time != null and qrcode_time != ''"> qrcode_time = #{qrcode_time},</if>
+			<if test="employee_code != null and employee_code != ''"> employee_code = #{employee_code},</if>
+			<if test="birthday != null and birthday != ''"> birthday = #{birthday},</if>
+			<if test="email != null and email != ''"> email = #{email},</if>
+			<if test="head_image != null and head_image != ''"> head_image = #{head_image},</if>
+			<if test="passwd != null and passwd != ''"> passwd = #{passwd},</if>
+			<if test="position != null and position != ''"> position = #{position},</if>
+			<if test="manager_id != null and manager_id != ''"> manager_id = #{manager_id},</if>
+		</set>
+		<where>
+			id = #{daqUserId}
+		</where>
+	</update>
+	
+	<!-- 获取daqUser关联列表 -->
+	<select id="getDaqRelateDataListPage" parameterType="page" resultType="pd">
+		SELECT
+			<if test="pd.operate == 1 or pd.operate == 2"><!-- 车队 -->
+				id,number,company
+			</if>
+			<if test="pd.operate == 3 or pd.operate == 4 or pd.operate == 5"><!-- 商户 -->
+				id,name,contract_code,code shopCode
+			</if>
+		FROM
+			<if test="pd.operate == 3 or pd.operate == 4 or pd.operate == 5"><!-- 商户 -->
+				<include refid="shop-info"/>
+			</if>
+		<where>
+			<if test="pd.operate == 3"><!-- 获取daqUser已关联签约商户列表 -->
+				follow_daq_id = #{pd.daqUserId} AND sign_status &gt; -2
+				<if test="pd.name != null and pd.name != ''"> AND name LIKE CONCAT('%',#{pd.name},'%' )</if>
+				<if test="pd.province != null and pd.province != ''"> AND province = #{pd.province}</if>
+				<if test="pd.city != null and pd.city != ''"> AND province = #{pd.city}</if>
+				<if test="pd.district != null and pd.district != ''"> AND province = #{pd.district}</if>
+			</if>
+			<if test="pd.operate == 4"><!-- 获取无人关联商户列表 -->
+				follow_daq_id is NULL
+				<if test="pd.name != null and pd.name != ''"> AND name LIKE CONCAT('%',#{pd.name},'%' )</if>
+				<if test="pd.province != null and pd.province != ''"> AND province = #{pd.province}</if>
+				<if test="pd.city != null and pd.city != ''"> AND province = #{pd.city}</if>
+				<if test="pd.district != null and pd.district != ''"> AND province = #{pd.district}</if>
+			</if>
+			<if test="pd.operate == 5"><!-- 获取daqUser关联跟进商户列表 -->
+				follow_daq_id = #{pd.daqUserId}
+				<if test="pd.name != null and pd.name != ''"> AND name LIKE CONCAT('%',#{pd.name},'%' )</if>
+				<if test="pd.province != null and pd.province != ''"> AND province = #{pd.province}</if>
+				<if test="pd.city != null and pd.city != ''"> AND province = #{pd.city}</if>
+				<if test="pd.district != null and pd.district != ''"> AND province = #{pd.district}</if>
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查询指定BD与指定商户存在推广关联关系记录数 -->
+	<select id="getDaqShopRelationshipNum" parameterType="pd" resultType="int">
+		SELECT 
+			COUNT(id) rowNum 
+		FROM 
+			<include refid="daq-relationship"/> 
+		WHERE 
+			relate_id = #{shopId} AND type = 2 AND end_date IS NULL
+	</select>
+	
+	<!-- 添加BD与车队（type=1）、商户（type=2） 的关联关系-->
+	<insert id="beginDaqRelationship" parameterType="pd">
+		INSERT INTO 
+			<include refid="daq-relationship"/>
+			(relate_id,type,begin_date,daq_user_id)
+		VALUES
+			<foreach collection="relateIds" item="tmpId" separator=",">
+				(#{tmpId},#{type},NOW(),#{daqUserId})
+			</foreach>
+	</insert>
+	
+	<!-- 解除BD与车队（type=1）、商户（type=2） 的关联关系-->
+	<update id="endDaqRelationship" parameterType="pd">
+		UPDATE
+			<include refid="daq-relationship"/>
+		<set>
+			end_date = NOW()
+		</set>
+		<where>
+			daq_user_id = #{daqUserId} AND type = #{type} AND end_date IS NULL AND relate_id IN
+			<foreach collection="relateIds" item="tmpId" open="(" close=")" separator=",">
+				#{tmpId}
+			</foreach>
+		</where>
+	</update>
+
+	<!-- 维护daqUser的关联关系 -->
+	<update id="modifyDaqRelationship" parameterType="pd">
+		UPDATE
+			<if test="operate == 3 or operate == 4 or operate == 5"><!-- 商户 -->
+				<include refid="shop-info"/>
+			</if>
+		<set>
+			<if test="operate == 3 or operate == 4 or operate == 5"><!-- 商户 -->
+				follow_daq_id = #{daqUserId},
+			</if>
+			relevan_time = #{relevanTime},
+		</set>
+		<where>
+			id IN
+			<foreach collection="relateIds" item="tmpId" open="(" separator="," close=")">
+				#{tmpId}
+			</foreach>
+		</where>
+	</update>
+
+	<!-- 获取未绑定后台管理员的DaqUser列表 -->
+	<select id="getUnRelateDaqUserListPage" parameterType="page" resultType="pd">
+		SELECT
+			id,mobile,name
+		FROM
+			<include refid="daq-user"/>
+		<where>
+			manager_id IS NULL
+			<if test="pd.mobile != null and pd.mobile != ''">
+				AND mobile LIKE CONCAT('%',#{pd.mobile},'%' )
+			</if>
+		</where>
+	</select>
+	
+	<!-- 判断手机号是否存在 -->
+	<select id="getMobileCount" parameterType="string" resultType="pd">
+		SELECT
+			id,COUNT(id) rowNum
+		FROM
+			<include refid="daq-user"/>
+		<where>
+			mobile = #{mobile}
+		</where>
+	</select>
+	
+	<!-- 获取所有商户负责人 -->
+	<select id="getAllFollowDaqUserList" parameterType="string" resultType="pd">
+		SELECT
+			id,name
+		FROM
+			<include refid="daq-user"/>
+	</select>
+	
+	<!-- 获取刨除自己之外的所有在职BD用户列表（可接收离职BD跟进商户BD列表） -->
+	<select id="getAcceptDaqUserList" parameterType="string" resultType="pd">
+		SELECT
+			id,name
+		FROM
+			<include refid="daq-user"/>
+		WHERE
+			id != #{dimissionDaqId} AND state = 1
+	</select>
+	
+</mapper>

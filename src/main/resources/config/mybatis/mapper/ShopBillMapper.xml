@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ShopBillMapper">
+
+	<sql id="shop-bill"> kcqb_shop_bill</sql>
+	<sql id="comment-details">kcqb_comment_details</sql>
+	<sql id="shop-employee">kcqb_shop_employee</sql>
+	<sql id="shop-info">kcqb_shop_info</sql>
+
+	<!-- 交易记录列表查询 -->
+  	<select id="getShopBillListPage" parameterType="page" resultType="pd">
+    	SELECT 
+	   		a.id id, bill_code billCode, card_code cardCode, trade_status tradeStatus, a.type type, 
+	   		pay_type payType, a.amount amount, trade_time tradeTime, b.mobile createdMobile,
+	   		(SELECT name FROM <include refid="shop-info"/> WHERE id = a.shop_id) shopName
+	   	FROM 
+    		<include refid="shop-bill"/> a LEFT JOIN <include refid="shop-employee"/> b ON a.created_by = b.id 
+    	<where>
+    		1 = 1
+    		<if test="pd.billCode !=null and pd.billCode != ''">
+    			AND bill_code LIKE CONCAT('%',#{pd.billCode},'%')
+    		</if>
+    		<if test="pd.cardCode !=null and pd.cardCode != ''">
+    			AND card_code LIKE CONCAT('%',#{pd.cardCode},'%')
+    		</if>
+    		<if test="pd.createdMobile !=null and pd.createdMobile != ''">
+    			AND b.mobile LIKE CONCAT('%',#{pd.createdMobile},'%')
+    		</if>
+    		<if test="pd.tradeStatus !=null and pd.tradeStatus != ''">
+    			AND trade_status = #{pd.tradeStatus}
+    		</if>
+    		<if test="pd.type !=null and pd.type != ''">
+    			AND a.type = #{pd.type}
+    		</if>
+    		<if test="pd.beginTradeTime !=null and pd.beginTradeTime != ''">
+    			AND trade_time &gt;= #{pd.beginTradeTime}
+    		</if>
+    		<if test="pd.endTradeTime !=null and pd.endTradeTime != ''">
+    			AND trade_time &lt;= DATE_ADD(#{pd.endTradeTime},INTERVAL 1 DAY)
+    		</if>
+    		<if test="pd.shopId != null and pd.shopId != ''">
+				AND a.shop_id = #{pd.shopId}
+			</if>
+		</where>
+		ORDER BY trade_status, id DESC 
+  	</select>
+  	
+  	<!-- 查看详情 -->
+  	<select id="getRecordDetailById" parameterType="string" resultType="pd">
+  		SELECT 
+  			bill_code billCode, trade_status tradeStatus, type, pay_type payType, amount, 
+  			card_code cardCode, pay_mobile payMobile, created_at createdAt, trade_time tradeTime,account_time accountTime,
+  			(SELECT code FROM <include refid="shop-info"/> WHERE id = a.shop_id) shopCode,
+  			(SELECT name FROM <include refid="shop-info"/> WHERE id = a.shop_id) shopName,
+  			(SELECT name FROM <include refid="shop-employee"/> WHERE id = a.created_by) createdName,
+  			(SELECT mobile FROM <include refid="shop-employee"/> WHERE id = a.created_by) createdMobile
+  		FROM
+  			<include refid="shop-bill"/> a
+  		WHERE 
+  			id = #{id}
+  	</select>
+  	
+	<!-- 更新 -->  	
+  	<update id="update" parameterType="pd">
+  		UPDATE
+  			<include refid="shop-bill"/>
+  		<set>
+  			updated_at = NOW(),
+  			<if test="tradeStatus != null and tradeStatus != ''">
+	  			trade_status = #{tradeStatus},
+  			</if>
+  			<if test="tradeStatus == 1">
+	  			trade_time = NOW(),
+  			</if>
+  			<if test="tradeStatus == 3">
+	  			account_time = NOW(),
+  			</if>
+  		</set> 
+  		WHERE 
+  			id = #{id}
+  	</update>
+  	
+  	<!-- 商户列表查看商户订单 -->
+  	<select id="shopBillListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		sb.*,
+    		(SELECT si.name FROM <include refid="shop-info"/> si WHERE si.id = sb.shop_id) AS name 
+    	FROM 
+    		<include refid="shop-bill"/> sb
+    	<where>
+    		1 = 1
+    		<if test="pd.accountId != null and pd.accountId != '' "> and sb.pay_by = #{pd.accountId}</if>
+			<if test="pd.trade_status != null and pd.trade_status != '' and pd.trade_status !='-1' "> and sb.trade_status = #{pd.trade_status}</if>
+			<if test="pd.type != null and pd.type != '' and pd.type !='-1' "> and find_in_set(sb.type, #{pd.type}) </if>
+			<if test="pd.pay_type != null and pd.pay_type != '' and pd.pay_type !='-1' "> and sb.pay_type = #{pd.pay_type}</if>
+			
+			<if test="pd.log_date_start != null and pd.log_date_start != ''"> 
+			<![CDATA[
+			
+			 AND DATE_FORMAT(sb.trade_time,'%Y-%m-%d')>= DATE_FORMAT(#{pd.log_date_start}, '%Y-%m-%d') 
+			 ]]>
+			</if>
+			<if test="pd.log_date_end != null and pd.log_date_end != ''">
+			<![CDATA[
+			 AND DATE_FORMAT(sb.trade_time,'%Y-%m-%d')<= DATE_FORMAT(#{pd.log_date_end}, '%Y-%m-%d') 
+			  ]]>
+			</if>
+			<!-- add by JHONNY begin-->
+			<if test="pd.shopId != null and pd.shopId != ''">
+				AND sb.shop_id = #{pd.shopId}
+			</if>
+			<if test="pd.bill_code != null and pd.bill_code != ''">
+				AND sb.bill_code LIKE CONCAT('%',#{pd.bill_code},'%')
+			</if>
+			<if test="pd.pay_name != null and pd.pay_name != ''">
+				AND sb.pay_name LIKE CONCAT('%',#{pd.pay_name},'%')
+			</if>
+			<if test="pd.pay_mobile != null and pd.pay_mobile != ''">
+				AND sb.pay_mobile LIKE CONCAT('%',#{pd.pay_mobile},'%')
+			</if>
+	
+			<if test="pd.rebate_model != null and pd.rebate_model != '-1'">
+				AND sb.rebate_model = #{pd.rebate_model}
+			</if>
+			<if test="pd.balance_pay != null and pd.balance_pay != ''">
+				AND sb.balance_pay &gt; 0
+			</if>
+			<if test="pd.rebate_amount != null and pd.rebate_amount != ''">
+				AND sb.rebate_amount &gt; 0
+			</if>
+			<if test="pd.coupon_pay != null and pd.coupon_pay != ''">
+				AND sb.coupon_pay &gt; 0
+			</if>
+			<if test="pd.trade_time_begin != null and pd.trade_time_begin != ''">
+				AND DATE_FORMAT(sb.trade_time,'%Y-%m-%d') &gt;= #{pd.trade_time_begin}
+			</if>
+			<if test="pd.trade_time_end != null and pd.trade_time_end != ''">
+				AND DATE_FORMAT(sb.trade_time,'%Y-%m-%d') &lt;= #{pd.trade_time_end}
+			</if>
+    	</where> 
+  	</select>
+  	
+</mapper>

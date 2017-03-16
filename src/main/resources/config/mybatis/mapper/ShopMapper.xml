@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ShopMapper">
+
+	<sql id="shop-info">kcqb_shop_info</sql>
+	<sql id="shop-service-type">kcqb_shop_service_type</sql>
+	<sql id="shop-employee">kcqb_shop_employee</sql>
+	<sql id="shop-bill">kcqb_shop_bill</sql>
+	<sql id="comment-details">kcqb_comment_details</sql>
+	<sql id="service-type">kcqb_service_type</sql>
+	<sql id="shop-info1">kcqb_shop_info si</sql>
+	<sql id="daq-user">kcqb_daq_user</sql>
+	<sql id="operate-log">kcqb_operate_log</sql>
+	<sql id="image-detail">kcqb_image_detail</sql>
+	<sql id="manager">kcqb_sys_user</sql>
+	<sql id="account-card-relationship">kcqb_account_card_relationship</sql>
+	<sql id="service-type-relationship">kcqb_service_type_relationship</sql>
+	
+	<sql id="base_column">
+		id, code, name, province, city, district, address, longitude, latitude, linkman, link_tel, state, sign_daq_id,
+		contract_img, contract_begin_time, contract_end_time, total_rebate_percent, confirm_money, gatherer_id, shopkeeper_id, 
+		reg_name, reg_img,bank_card_name, bank_name, bank_card_code, bank_card_type,created_at,updated_at
+	</sql>
+	
+	<sql id="base_shop_rebate_column">
+		id,state,sign_status,contract_code,contract_img,contract_begin_time,contract_end_time,shopkeeper_id,reg_name,reg_img,bank_card_name,bank_name,bank_card_code,bank_card_type,rebate_remark,
+		name,province,city,district,address,longitude,latitude,link_tel,door_service,operate_state,check_status,manager_mobile,manager_name,manager_idcard,idcard_img1,idcard_img2,sign_daq_id,turnover
+	</sql>
+	
+	<!-- 动态组装复合查询条件 -->
+	<sql id="pd_condition_sql">
+		<if test="pd.name != null and pd.name != ''"> AND a.name LIKE CONCAT('%',#{pd.name},'%' )</if>
+		<if test="pd.code != null and pd.code != ''"> AND a.code LIKE CONCAT('%',#{pd.code},'%' )</if>
+		<if test="pd.shopkeeperName != null and pd.shopkeeperName != ''"> AND b.name LIKE CONCAT('%',#{pd.shopkeeperName},'%' )</if>
+		<if test="pd.shopkeeperMobile != null and pd.shopkeeperMobile != ''"> AND b.mobile LIKE CONCAT('%',#{pd.shopkeeperMobile},'%' )</if>
+		<if test="pd.province != null and pd.province != '' and pd.province != '省份'"> AND province = #{pd.province}</if>
+		<if test="pd.city != null and pd.city != '' and pd.city != '地级市'"> AND city = #{pd.city}</if>
+		<if test="pd.district != null and pd.district != '' and pd.district != '市、县级市'"> AND district = #{pd.district}</if>
+		<if test="pd.state != null and pd.state != ''"> <!-- 上架状态 -->
+			<if test="pd.state == 1"><!-- 上架 -->
+				AND a.state = 1
+			</if>
+			<if test="pd.state == 0"><!-- 下架 -->
+				AND a.state != 1
+			</if>
+		</if>
+		<!-- 服务类型 -->
+		<if test="pd.oneService != null and pd.oneService != '-1'"> AND id IN (SELECT DISTINCT(shop_id) FROM <include refid="shop-service-type"/> WHERE service_type_id = #{pd.oneService})</if>
+		<if test="pd.twoService != null and pd.twoService != '-1'"> AND id IN (SELECT DISTINCT(shop_id) FROM <include refid="shop-service-type"/> WHERE service_type_id = #{pd.twoService})</if>
+	</sql>
+	
+	<!-- 翻页获取列表页数据 -->
+  	<select id="findByListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		a.id id, a.code code, a.name name, province, city, district, address, a.state state, b.name shopkeeperName,b.mobile shopkeeperMobile,
+    		(SELECT count(id) + 1 FROM <include refid="shop-employee"/> WHERE shop_id = a.id AND <include refid="shop-employee"/>.is_owner = 0) employeeNum,
+    		(SELECT count(id) FROM <include refid="shop-bill"/> WHERE shop_id = a.id AND trade_status = 3) billNum,
+    		(SELECT count(id) FROM <include refid="account-card-relationship"/> WHERE shop_id = a.id) openCardNum,
+    		IFNULL((SELECT sum(amount) FROM <include refid="shop-bill"/> WHERE shop_id = a.id AND trade_status = 3 AND type = 11),0) rechargeAmount,
+    		IFNULL((SELECT sum(amount) FROM <include refid="shop-bill"/> WHERE shop_id = a.id AND trade_status = 3 AND type = 10),0) consumeAmount
+    	FROM 
+    		<include refid="shop-info"/> a LEFT JOIN <include refid="shop-employee"/> b ON a.shopkeeper_id = b.id
+    	<where>
+    		<include refid="pd_condition_sql"/>
+    	</where>
+   		 ORDER BY id DESC 
+  	</select>
+  	
+  	<!-- 获取所有的一级服务类型 -->
+  	<select id="findAllOneServiceType" parameterType="string" resultType="pd">
+		SELECT
+			id,name
+		FROM
+			<include refid="service-type"/>
+		WHERE
+			type = 0 AND (
+						SELECT
+							count(id)
+						FROM
+							<include refid="service-type-relationship"/>
+						WHERE
+							service_type_id = <include refid="service-type"/>.id
+					) > 0
+  	</select>
+  	
+  	<!-- 获取所有的二级服务类型 -->
+  	<select id="findAllTwoServiceType" parameterType="string" resultType="pd">
+  		SELECT
+			b.id id,b.NAME name,a.service_type_id parentId
+		FROM
+			<include refid="service-type-relationship"/> a LEFT JOIN <include refid="service-type"/> b ON a.service_brand_id = b.id
+		WHERE
+			a.type = 2
+		ORDER BY parentId
+  	</select>
+  	
+  	<!-- 获取所有的品牌 -->
+  	<select id="findAllBrand" parameterType="string" resultType="pd">
+  		SELECT
+			id,name
+		FROM
+			<include refid="service-type"/>
+		WHERE
+			type = 1
+  	</select>
+	
+	<!-- 插入 -->
+	<insert id="insert-base" parameterType="pd" keyProperty="shopId" useGeneratedKeys="true">
+		INSERT INTO <include refid="shop-info"/>  (
+			name,province,city,district,address,longitude,latitude,linkman,link_tel,state,
+			bank_card_name,bank_name,bank_card_code,bank_card_type,reg_name,total_rebate_percent,
+			confirm_money,contract_begin_time,contract_end_time,sign_daq_id,gatherer_id,shopkeeper_id,
+			contract_img,reg_img,created_at,updated_at
+		) VALUES ( 
+			#{name},#{province},#{city},#{district},#{address},#{longitude},#{latitude},#{linkman},#{link_tel},#{state},
+			#{bank_card_name},#{bank_name},#{bank_card_code},#{bank_card_type},#{reg_name},#{total_rebate_percent},
+			#{confirm_money},#{contract_begin_time},#{contract_end_time},#{signDaqId},#{gatherer_id},#{shopkeeper_id},
+			#{contract_img},#{reg_img},NOW(),NOW()
+		)
+	</insert>
+	
+	<!-- 批量插入商户和一、二级服务类型及品牌的关联关系 -->
+	<insert id="insert-shop-relationship" parameterType="pd">
+		INSERT INTO 
+			<include refid="shop-service-type"/>(shop_id,service_type_id,type)
+		VALUES
+			<foreach collection="valArr" separator="," item="tmpVal">
+				(#{shopId},#{tmpVal},#{type})
+			</foreach>
+	</insert>
+	
+	<!-- 清除指定商户的关联关系 -->
+	<delete id="clear-shop-relationship" parameterType="string" flushCache="true">
+		DELETE FROM <include refid="shop-service-type"/> WHERE shop_id = #{shopId}
+	</delete>
+	
+	<!-- 获取指定商户的关联关系 -->
+	<select id="find-shop-relationship" parameterType="string" resultType="pd">
+		SELECT service_type_id,type FROM <include refid="shop-service-type"/> WHERE shop_id = #{shopId}
+	</select>
+	
+	<!-- 更新 -->
+	<update id="update" parameterType="pd">
+		UPDATE 
+			<include refid="shop-info"/>
+		<set>
+			updated_at = NOW(),
+			<if test="name != null and name != ''">
+				name = #{name},
+			</if>
+			<if test="link_tel != null and link_tel != ''">
+				link_tel = #{link_tel},
+			</if>
+			<if test="address != null and address != ''">
+				address = #{address},
+			</if>
+			<if test="province != null and province != ''">
+				province = #{province},
+			</if>
+			<if test="city != null and city != ''">
+				city = #{city},
+			</if>
+			<if test="district != null and district != ''">
+				district = #{district},
+			</if>
+			<if test="longitude != null and longitude != ''">
+				longitude = #{longitude},
+			</if>
+			<if test="latitude != null and latitude != ''">
+				latitude = #{latitude},
+			</if>
+			<if test="code != null and code != ''">
+				code = #{code},
+			</if>
+			<if test="reg_name != null and reg_name != ''">
+				reg_name = #{reg_name},
+			</if>
+			<if test="reg_img != null and reg_img != ''">
+				reg_img = #{reg_img},
+			</if>
+			<if test="contract_img != null and contract_img != ''">
+				contract_img = #{contract_img},
+			</if>
+			<if test="contract_begin_time != null and contract_begin_time != ''">
+				contract_begin_time = #{contract_begin_time},
+			</if>
+			<if test="contract_end_time != null and contract_end_time != ''">
+				contract_end_time = #{contract_end_time},
+			</if>
+			<if test="total_rebate_percent != null and total_rebate_percent != ''">
+				total_rebate_percent = #{total_rebate_percent},
+			</if>
+			<if test="gatherer_id != null and gatherer_id != ''">
+				gatherer_id = #{gatherer_id},
+			</if>
+			<if test="linkman != null">
+				linkman = #{linkman},
+			</if>
+			<if test="state != null and state != ''">
+				state = #{state},
+			</if>
+			<if test="shopkeeper_id != null and shopkeeper_id != ''">
+				shopkeeper_id = #{shopkeeper_id},
+			</if>
+			<if test="bank_card_name != null">
+				bank_card_name = #{bank_card_name},
+			</if>
+			<if test="bank_name != null and bank_name != ''">
+				bank_name = #{bank_name},
+			</if>
+			<if test="bank_card_code != null and bank_card_code != ''">
+				bank_card_code = #{bank_card_code},
+			</if>
+			<if test="bank_card_type != null and bank_card_type != ''">
+				bank_card_type = #{bank_card_type},
+			</if>
+			<if test="sign_daq_id != null and sign_daq_id != -1">
+				sign_daq_id = #{sign_daq_id},
+			</if>
+			<if test="confirm_money != null and confirm_money != ''">
+				confirm_money = #{confirm_money},
+			</if>
+		</set>
+		<where>
+			id = #{shopId} 
+		</where>
+	</update>
+	
+	<!-- 查询商户基本信息 -->
+  	<select id="getBaseById" parameterType="string" resultType="pd">
+    	SELECT <include refid="base_column"/> FROM <include refid="shop-info"/> WHERE id = #{shopId}
+  	</select>
+  	
+  	<!-- 查询商户基本信息 -->
+  	<select id="getShopRebateBaseById" parameterType="string" resultType="pd">
+    	SELECT 
+    		<include refid="base_shop_rebate_column"/>,
+    		(SELECT name FROM <include refid="daq-user"/> WHERE id = sign_daq_id) signDaqName,
+    		(SELECT COUNT(id) FROM <include refid="shop-service-type"/> WHERE shop_id = #{shopId} AND type = 2) serviceTypeNum,
+    		(SELECT COUNT(id) FROM <include refid="shop-service-type"/> WHERE shop_id = #{shopId} AND type = 1) brandNum,
+    		(SELECT COUNT(id) FROM <include refid="image-detail"/> WHERE source_table = 'shop_info' AND source_id = #{shopId} AND type = 2) imgNum
+    	FROM 
+    		<include refid="shop-info"/> 
+    	WHERE 
+    		id = #{shopId}
+  	</select>
+  	
+  	
+  	<!-- 根据商户Id获取指定类型的商户关联关系 -->
+  	<select id="getShopRelationShopByIdAndType" parameterType="pd" resultType="pd">
+  		SELECT 
+  			id,name 
+  		FROM 
+  			<include refid="service-type"/> 
+  		WHERE 
+  			id IN 
+  				(SELECT service_type_id FROM <include refid="shop-service-type"/> WHERE shop_id = #{shopId} AND type = #{type})
+  	</select>
+  	
+	
+	<!-- 管理人关联商户基本信息 -->
+  	<select id="getShopInfoList" parameterType="pd" resultType="pd">
+    	SELECT <include refid="base_column"/>,
+    	(select count(sb.id) from <include refid="shop-bill"/> sb where  sb.shop_id = si.id and sb.trade_status=3) as billnum,
+    	IFNULL((select sum(sb.amount) from <include refid="shop-bill"/> sb where  sb.shop_id = si.id and sb.trade_status=3),0) as amountnum,
+    	((select sum(cd.score) from <include refid="shop-bill"/> sb,comment_details cd  where sb.id = cd.source_id and cd.type = 1 and cd.audit=2 and cd.del_type=0 and sb.shop_id = si.id and sb.trade_status=3)/
+    	(select count(cd.id) from <include refid="shop-bill"/> sb,comment_details cd  where sb.id = cd.source_id and cd.type = 1 and cd.audit=2 and cd.del_type=0 and sb.shop_id = si.id and sb.trade_status=3)) as score,
+    	(select count(cd.id) from <include refid="shop-bill"/> sb,comment_details cd  where sb.id = cd.source_id and cd.type = 1 and cd.audit=2 and cd.del_type=0 and sb.shop_id = si.id and sb.trade_status=3) as numbers,
+    	(select count(se.id) from <include refid="shop-employee"/> se where se.shop_id = si.id) as empnums 
+    	 FROM <include refid="shop-info1"/> WHERE si.shopkeeper_id = #{manager_id}
+  	</select>
+  	<sql id="pd_condition_sql1">
+		<if test="pd.name != null and pd.name != ''"> AND name LIKE CONCAT('%',#{pd.name},'%' )</if>
+		<if test="pd.code != null and pd.code != ''"> AND code LIKE CONCAT('%',#{pd.code},'%' )</if>
+  	</sql>
+  			<!--商户基本信息列表 -->
+  	<select id="getShopInfoListPage" parameterType="page" resultType="pd">
+    	SELECT <include refid="base_column"/> ,
+    	(SELECT group_concat(name) FROM <include refid="service-type"/> WHERE id IN (SELECT service_type_id FROM <include refid="shop-service-type"/> WHERE shop_id = <include refid="shop-info"/>.id AND type = 2)) serviceName
+    	
+   		  FROM <include refid="shop-info"/> 	<where>
+    		<include refid="pd_condition_sql1"/> and state = 1
+    	</where>
+  	</select>
+  	
+  	<!-- 获取合同号存在的记录数 -->
+  	<select id="getContractCode" parameterType="string" resultType="pd">
+  		SELECT count(id) contractCodeNum FROM <include refid="shop-info"/> WHERE contract_code = #{contractCode}
+  	</select>
+  	
+  	<!-- 获取商户名称存在的记录数 -->
+  	<select id="getShopNameNum" parameterType="string" resultType="pd">
+  		SELECT count(id) shopNameNum FROM <include refid="shop-info"/> WHERE name = #{shopName}
+  	</select>
+  	
+  	<!-- 获取商户待审核列表 -->
+  	<select id="getAuthShopByListPage" parameterType="page" resultType="pd">
+  		SELECT 
+  			id,name,province,city,district,sign_status,state,linkman,link_tel,source,base_commit_time,sign_commit_time,sign_auth_remark,base_auth_remark,
+  			(SELECT realname FROM <include refid="manager"/> WHERE id = base_commit_id) base_commit_username,
+  			(SELECT realname FROM <include refid="manager"/> WHERE id = sign_commit_id) sign_commit_username,
+  			(SELECT group_concat(name) FROM <include refid="service-type"/> WHERE id IN (SELECT service_type_id FROM <include refid="shop-service-type"/> WHERE shop_id = a.id AND type = 2)) serviceName,
+  			(SELECT name FROM <include refid="daq-user"/> WHERE id = follow_daq_id) followUserName
+  		FROM
+  			<include refid="shop-info"/> a
+  		<where>
+  			<if test="pd.module == 4"><!-- 运营后台待审核商户状态 -->
+  				((state &gt; -6 AND state &lt; 0) OR (sign_status &gt; -4 AND sign_status &lt; 0))
+  			</if>
+  			<if test="pd.module == 3"><!-- BD总监待审核商户状态 -->
+				sign_status &gt; -6 AND sign_status &lt; 0
+  			</if>
+  			<if test="pd.shopName != null and pd.shopName != ''"> AND name LIKE CONCAT('%',#{pd.shopName},'%' )</if>
+  			<if test="pd.managerName != null and pd.managerName != ''"> AND manager_name LIKE CONCAT('%',#{pd.managerName},'%' )</if>
+  			<if test="pd.managerMobile != null and pd.managerMobile != ''"> AND manager_mobile LIKE CONCAT('%',#{pd.managerMobile},'%' )</if>
+  			<if test="pd.follow_daq_id != null and pd.follow_daq_id != '-1'"> AND follow_daq_id = #{pd.follow_daq_id}</if>
+  			<if test="pd.beginDate != null and pd.beginDate != ''"> AND DATE_FORMAT(a.sign_commit_time,'%Y-%m-%d') &gt;= #{pd.beginDate}</if>
+  			<if test="pd.endDate != null and pd.endDate != ''"> AND DATE_FORMAT(a.sign_commit_time,'%Y-%m-%d') &lt;= #{pd.endDate}</if>
+  			<if test="pd.linkman != null and pd.linkman != ''"> AND linkman LIKE CONCAT('%',#{pd.linkman},'%' )</if>
+  			<if test="pd.link_tel != null and pd.link_tel != ''"> AND link_tel LIKE CONCAT('%',#{pd.link_tel},'%' )</if>
+			<if test="pd.source == 0"> AND source = 0</if><!-- 线上录入 -->
+			<if test="pd.source == 1"> AND source &gt; 0</if><!-- BD录入 -->
+			<if test="pd.sign_status == 1"> AND sign_status &gt; -7</if><!-- 签约 -->
+ 			<if test="pd.sign_status == 2"> AND sign_status = -7</if><!-- 未签约 -->
+  		</where>
+  		 ORDER BY a.id DESC
+  	</select>
+  	
+  	<!-- 获取商户表中商户 Manager 相关的信息 -->
+  	<select id="getShopManagerInfo" parameterType="string" resultType="pd">
+  		SELECT
+			manager_mobile,manager_name,manager_idcard,idcard_img1,idcard_img2
+		FROM
+			<include refid="shop-info"/>
+		<where>
+			id = #{shopId}
+		</where>
+  	</select>
+  	
+  	
+  	<!-- 根据雇员信息获取商户列表 -->
+  	<select id="findListByEmployee" parameterType="page" resultType="pd">
+    	SELECT 
+    		id,code,name,province,city,district,state,address,link_tel,
+    		(SELECT group_concat(name) FROM <include refid="service-type"/> WHERE id IN (SELECT service_type_id FROM <include refid="shop-service-type"/> WHERE shop_id = <include refid="shop-info"/>.id AND type = 2)) serviceName,
+			(SELECT name FROM <include refid="shop-employee"/> WHERE id = <include refid="shop-info"/>.shopkeeper_id) managerName,
+			(SELECT mobile FROM <include refid="shop-employee"/> WHERE id = <include refid="shop-info"/>.shopkeeper_id) managerMobile,
+    		(SELECT count(id) FROM <include refid="shop-employee"/> WHERE shop_id = <include refid="shop-info"/>.id) employeeNum,
+    		(SELECT count(id) FROM <include refid="shop-bill"/> WHERE shop_id = <include refid="shop-info"/>.id AND trade_status = 3) billNum,
+    		(SELECT sum(amount) FROM <include refid="shop-bill"/> WHERE shop_id = <include refid="shop-info"/>.id AND trade_status = 3) totalAmount,
+    		(SELECT count(id) FROM <include refid="comment-details"/> WHERE source_id IN (SELECT id FROM <include refid="shop-bill"/> WHERE shop_id = <include refid="shop-info"/>.id AND trade_status = 3) AND type = 1 AND audit = 2 AND del_type = 0) commentNum,
+    		(SELECT sum(score) FROM <include refid="comment-details"/> WHERE source_id IN (SELECT id FROM <include refid="shop-bill"/> WHERE shop_id = <include refid="shop-info"/>.id AND trade_status = 3) AND type = 1 AND audit = 2 AND del_type = 0) totalScore
+    	FROM 
+    		<include refid="shop-info"/>
+    	<where>
+    	    <if test="pd.shopkeeperId != null and pd.shopkeeperId != ''">
+				shopkeeper_id = #{pd.shopkeeperId}
+			</if>
+			<if test="pd.shopId != null and pd.shopId != ''">
+				id = #{pd.shopId}
+			</if>
+    	</where>
+   		 ORDER BY id DESC 
+  	</select>
+  	
+</mapper>

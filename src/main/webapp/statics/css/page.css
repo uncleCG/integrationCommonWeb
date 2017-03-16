@@ -1,0 +1,8 @@
+@CHARSET "UTF-8";
+.pageTab{width:100%;margin:0px auto;padding:10px 0px 20px;}
+.pageTab div{float:left;margin-right:10px;}
+.pageTab div a,.pageTab div span{display:inline-block;border:1px solid #cecece;padding:1px 10px;border-radius:3px;background:#eee;}
+.pageTab div span{background:#fff;}
+.pageTab div label{margin:5px;color:#f00;}
+.changeCount{margin-top:2px;}
+#totalPage{margin-top:2px;}

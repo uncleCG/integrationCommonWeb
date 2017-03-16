@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CommentDetailsMapper">
+
+	<sql id="comment-details">kcqb_comment_details</sql>
+	<sql id="account">account</sql>
+	<sql id="shop-info">kcqb_shop_info</sql>
+	<sql id="shop-bill">kcqb_shop_bill</sql>
+	
+	<sql id="base-column">
+		*
+	</sql>
+	
+	<!-- 查询 -->
+  	<select id="getCommentByListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		a.id id,a.audit audit,a.comment comment,a.score score,a.creat_time creat_time,d.mobile account_mobile, b.code shop_code,b.name shop_name
+    	FROM 
+    		<include refid="comment-details"/> a,<include refid="shop-info"/> b,<include refid="shop-bill"/> c,<include refid="account"/> d
+    	WHERE 
+    		 a.source_id = c.id AND b.id = c.shop_id AND a.account_id = d.id AND a.type = #{pd.type} AND a.del_type = #{pd.del_type}
+    		 <if test="pd.shopId != null and pd.shopId != ''"> AND c.shop_id = #{pd.shopId}</if>
+    		 <if test="pd.shopId == null or pd.shopId == ''"> AND c.shop_id = b.id</if>
+    		 <if test="pd.shopName != null and pd.shopName != ''"> AND b.name LIKE CONCAT('%',#{pd.shopName},'%' )</if>
+    		 <if test="pd.accountMobile != null and pd.accountMobile != ''"> AND d.mobile LIKE CONCAT('%',#{pd.accountMobile},'%' )</if>
+    		 <if test="pd.comment != null and pd.comment != ''"> AND a.comment LIKE CONCAT('%',#{pd.comment},'%' )</if>
+    		 <if test="pd.audit != null and pd.audit != ''"> AND a.audit = #{pd.audit}</if>
+    		 <if test="pd.score != null and pd.score != -1 "> AND a.score = #{pd.score}</if>
+    		 <if test="pd.beginDate != null and pd.beginDate != ''"> AND DATE_FORMAT(a.creat_time,'%Y-%m-%d') &gt;= #{pd.beginDate}</if>
+    		 <if test="pd.endDate != null and pd.endDate != ''"> AND DATE_FORMAT(a.creat_time,'%Y-%m-%d') &lt;= #{pd.endDate}</if>
+  	</select>
+  	
+  	<!-- 获取评价详情 -->
+  	<select id="getCommentInfoById" parameterType="string" resultType="pd">
+  		SELECT 
+    		a.id id,a.score score,a.comment comment,a.creat_time creat_time,a.audit audit,
+    		(SELECT mobile FROM <include refid="account"/> WHERE id = a.account_id) account_mobile,
+    		(SELECT name FROM <include refid="shop-info"/> WHERE id = (SELECT shop_id FROM <include refid="shop-bill"/> WHERE id = a.source_id)) shop_name
+    	FROM 
+    		<include refid="comment-details"/> a
+    	WHERE 
+    		 a.id = #{commentId}
+  	</select>
+  	
+  	<!-- 修改 -->
+  	<update id="update" parameterType="pd" flushCache="true">
+  		UPDATE 
+  			<include refid="comment-details"/>
+  		<set>
+  			<if test="audit != null and audit != ''">
+	  			audit = #{audit},
+  			</if>
+  			<if test="audit_at != null and audit_at != ''">
+	  			audit_at = #{audit_at},
+  			</if>
+  			<if test="audit_time != null and audit_time != ''">
+	  			audit_time = #{audit_time},
+  			</if>
+  			<if test="del_type != null and del_type != ''">
+	  			del_type = #{del_type},
+  			</if>
+  			<if test="del_at != null and del_at != ''">
+	  			del_at = #{del_at},
+  			</if>
+  			<if test="del_time != null and del_time != ''">
+	  			del_time = #{del_time},
+  			</if>
+  		</set>
+  		<where>
+  			id = #{id}
+  		</where>
+  	</update>
+  	
+</mapper>

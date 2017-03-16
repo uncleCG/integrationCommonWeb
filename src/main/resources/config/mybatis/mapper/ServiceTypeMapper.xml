@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ServiceTypeMapper">
+
+	<sql id="service-type"> kcqb_service_type </sql>
+	<sql id="service-type-relationship">kcqb_service_type_relationship</sql>
+	<sql id="shop-service-type">kcqb_shop_service_type</sql>
+	<sql id="shop-info">kcqb_shop_info</sql>
+	
+	<sql id="base_column">
+		id,name,type,state,full_name,logo
+	</sql>
+	
+	<!-- 插入 -->
+	<insert id="insert" parameterType="pd" keyProperty="id" useGeneratedKeys="true">
+		insert into <include refid="service-type"/>  (
+			name,type,state,full_name,logo 
+		) values ( 
+			#{name},#{type},#{state},#{full_name},#{logo}
+		)
+	</insert>
+	
+	<!-- 更新 -->
+	<update id="update" parameterType="pd">
+		update <include refid="service-type"/>
+		<set>			
+			<if test="name !=null and name != ''">name = #{name},</if>
+			<if test="state != null and state != ''" >state = #{state},</if>
+			<if test="full_name != null and full_name != ''">full_name = #{full_name},</if>
+			<if test="logo != null and logo != ''">logo = #{logo},</if>
+		</set>
+		<where>
+			id = #{id} 
+			<!-- 一级屏蔽时级联屏蔽其下所有二级 -->
+			<if test="parentId != null and parentId != '' and state == 0"> 
+				OR id IN (SELECT service_brand_id FROM service_type_relationship WHERE service_type_id = #{parentId} AND type = 2) 
+			</if>
+		</where>
+	</update>
+	
+	<!-- 查询一级服务或品牌详情 -->
+  	<select id="getById" parameterType="int" resultType="pd">
+    	SELECT 
+    		<include refid="base_column"/>
+    	FROM 
+    		<include refid="service-type"/>
+    	<where>
+	    	id = #{id}
+    	</where>
+  	</select>
+  	
+  	<!-- 翻页查询一级服务或品牌 -->
+  	<select id="findByListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		<include refid="base_column"/>,
+    		(SELECT count(id) FROM <include refid="service-type-relationship"/> WHERE service_type_id = <include refid="service-type"/>.id AND type = 2) secServiceTypeNum,
+    		(SELECT count(s.id) FROM <include refid="shop-service-type"/> s LEFT JOIN <include refid="shop-info"/> i ON s.shop_id = i.id WHERE s.service_type_id = <include refid="service-type"/>.id AND s.type = #{pd.type} AND i.state = 1) signShopNum,
+    		(SELECT count(s.id) FROM <include refid="shop-service-type"/> s LEFT JOIN <include refid="shop-info"/> i ON s.shop_id = i.id WHERE s.service_type_id = <include refid="service-type"/>.id AND s.type = #{pd.type} AND i.state != 1) commonShopNum
+    	FROM
+    		<include refid="service-type"/>
+    	<where> 
+    		type = #{pd.type}
+    	</where>
+  	</select>
+  	
+  	<!-- 获取所有上架状态的一级服务类型 -->
+  	<select id="findAllOneService" parameterType="int" resultType="pd">
+  		SELECT
+  			id,name
+  		FROM
+  			<include refid="service-type"/>
+  		WHERE
+  			type = 0
+  	</select>
+  	
+  	<!-- 根据一级服务获取二级服务 -->
+  	<select id="findAllByOneService" parameterType="int" resultType="pd">
+  		SELECT
+  			id,name
+  		FROM
+  			<include refid="service-type"/>
+  		WHERE
+  			id IN (SELECT service_brand_id FROM <include refid="service-type-relationship"/> WHERE service_type_id = #{oneService}) AND type = 2 
+  	</select>
+  	
+  	<!-- 查询二级服务详情（未使用） -->
+  	<select id="getSecServiceById" parameterType="int" resultType="pd">
+    	SELECT 
+    		a.id id,a.name name,a.type type,a.state,b.service_type_id parentId
+    	FROM
+    		<include refid="service-type"/> a LEFT JOIN <include refid="service-type-relationship"/> b ON a.id = b.service_brand_id
+    	<where>
+	    	a.id = #{id}
+    	</where>
+  	</select>
+  	
+  	<!-- 翻页查询二级服务 -->
+  	<select id="findSecServiceByListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		a.id id,a.name name,a.type type,a.state,
+    		(SELECT count(s.id) FROM <include refid="shop-service-type"/> s LEFT JOIN <include refid="shop-info"/> i ON s.shop_id = i.id WHERE s.service_type_id = a.id AND s.type = #{pd.type} AND i.state = 1) signShopNum,
+    		(SELECT count(s.id) FROM <include refid="shop-service-type"/> s LEFT JOIN <include refid="shop-info"/> i ON s.shop_id = i.id WHERE s.service_type_id = a.id AND s.type = #{pd.type} AND i.state != 1) commonShopNum
+    	FROM
+    		<include refid="service-type"/> a LEFT JOIN <include refid="service-type-relationship"/> b ON a.id = b.service_brand_id
+    	<where> 
+    		b.service_type_id = #{pd.parentId} AND b.type = 2
+    	</where>
+  	</select>
+  	
+  	<!-- 删除 -->
+  	<delete id="delById" parameterType="int" flushCache="true">
+  		DELETE FROM <include refid="service-type"/> <where>id=#{id}</where>
+  	</delete>
+  	
+  	<!-- 删除指定二级服务id的关联关系 -->
+  	<delete id="delRelatioshipByServiceId" parameterType="int" flushCache="true">
+  		DELETE FROM <include refid="service-type-relationship"/> <where> service_brand_id = #{id} </where>
+  	</delete>
+  	
+  	<!-- 插入关联关系 -->
+  	<insert id="saveRelationShip" parameterType="pd" keyProperty="id" useGeneratedKeys="true">
+  		insert into <include refid="service-type-relationship"/>  (
+			service_type_id,service_brand_id,type 
+		) values ( 
+			#{serviceTypeId},#{serviceBrandId},#{type}
+		)
+  	</insert>
+  	
+  	<!-- 检查字符串是否存在 -->
+  	<select id="findIsExist" parameterType="pd" resultType="pd">
+  		SELECT 
+  			count(id) rowNum
+  		FROM 
+  			<include refid="service-type"/>
+  		WHERE
+  			<if test="type==1"> full_name = #{name}</if>
+  			<if test="type!=1"> name = #{name}</if>
+  	</select>
+  	
+</mapper>

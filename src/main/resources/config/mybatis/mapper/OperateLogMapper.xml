@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="OperateLogMapper">
+
+	<sql id="operate-log"> kcqb_operate_log </sql>
+	
+	<sql id="base-column">
+		user_id,username,operation,module,record_id,method,result,log_time,remark
+	</sql>
+	
+	<!-- 插入 -->
+	<insert id="insert" parameterType="pd" keyProperty="id" useGeneratedKeys="true">
+		INSERT INTO <include refid="operate-log"/>  (
+			user_id,username,operation,module,record_id,method,result,log_time,remark
+		) values ( 
+			#{user_id},#{username},#{operation},#{module},#{record_id},#{method},#{result},#{log_time},#{remark}
+		)
+	</insert>
+	
+	<!-- 查询 -->
+  	<select id="getLogByListPage" parameterType="page" resultType="pd">
+    	SELECT <include refid="base-column"/> FROM <include refid="operate-log"/> WHERE record_id = #{pd.shopId} ORDER BY id DESC
+  	</select>
+  	
+  	<!-- 查询商户上下架最近一次操作记录的信息 -->
+  	<select id="getLastestSwitchStateLog" parameterType="pd" resultType="pd">
+    	SELECT 
+    		<include refid="base-column"/> 
+    	FROM 
+    		<include refid="operate-log"/> 
+    	WHERE 
+    		id = (SELECT max(id) FROM <include refid="operate-log"/> WHERE record_id = #{shopId})
+  	</select>
+  	
+  	
+</mapper>

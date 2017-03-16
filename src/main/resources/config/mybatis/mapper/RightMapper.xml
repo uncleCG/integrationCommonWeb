@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="RightMapper">
+
+	<sql id="role">kcqb_sys_role</sql>
+	<sql id="right">kcqb_sys_right</sql>
+	<sql id="role_right">kcqb_sys_role_right</sql>
+	
+	<sql id="base_column">
+		*
+	</sql>
+	
+	<resultMap type="right" id="rightMap">
+		<id column="id" property="id"/>
+		<!-- 在这里处理 column 和 property 的关系，不做特殊处理的直接使用实体类中的property -->
+		<result column="parent_id" property="parentId"/>
+		<result column="created_at" property="createdAt"/>
+		<result column="updated_at" property="updatedAt"/>
+	</resultMap>
+	
+	<!-- 添加权限 -->
+	<insert id="insert" parameterType="right" useGeneratedKeys="true" flushCache="true">
+		INSERT INTO <include refid="right"/>(
+			name,description,link,seqnum,parent_id,type,created_at
+		)VALUES(
+			#{name},#{description},#{link},#{seqnum},#{parentId},#{type},NOW()
+		)
+	</insert>
+	
+	<!-- 更新权限 -->
+	<update id="update" parameterType="right">
+		UPDATE 
+			<include refid="right"/>
+		<set>
+			<if test="name != null and name != ''">
+				name = #{name},
+			</if>
+			<if test="description != null and description != ''">
+				description = #{description},
+			</if>
+			<if test="link != null and link != ''">
+				link = #{link},
+			</if>
+			<if test="seqnum != null and seqnum != ''">
+				seqnum = #{seqnum},
+			</if>		
+			<if test="parentId != null and parentId != ''">
+				parent_id = #{parentId},
+			</if>
+			<if test="type != null and name != ''">
+				type = #{type},
+			</if>
+			updated_at = NOW()
+		</set>
+		<where>
+			id = #{id} 
+		</where>
+	</update>
+	
+	<!-- 获取所有权限 -->
+	<select id="findAllRight" parameterType="pd" resultMap="rightMap">
+    	SELECT 
+    		<include refid="base_column"/> 
+    	FROM 
+    		<include refid="right"/> 
+  	</select>
+  	
+  	<!-- 根据权限id删除权限 -->
+  	<delete id="delRightById" parameterType="int" flushCache="true">
+  		DELETE FROM <include refid="right"/> <where> id = #{rightId} </where>
+  	</delete>
+  	
+  	<!-- 根据角色id获取其对应的权限 -->
+  	<select id="getRightByRoleId" parameterType="pd" resultMap="rightMap">
+    	SELECT 
+    		<!-- 一个用户多个角色的情况下，会出现根权限出现多次，所以使用 DISTINCT(cr.id) 保证根权限出现一次 -->
+    		DISTINCT(cr.id),cr.* 
+    	FROM 
+    		<include refid="right"/> cr,<include refid="role_right"/> crr 
+		WHERE
+			cr.id = crr.right_id AND crr.role_id IN (${roleIds})
+  	</select>
+  	
+  	<!-- 根据id获取详情 -->
+  	<select id="getRightById" parameterType="int" resultMap="rightMap">
+  		SELECT
+  			<include refid="base_column"/>
+  		FROM
+  			<include refid="right"/>
+  		WHERE
+  			id = #{rightId}
+  	</select>
+
+</mapper>

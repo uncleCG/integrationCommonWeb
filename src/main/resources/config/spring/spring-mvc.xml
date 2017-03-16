@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.2.xsd
+        http://www.springframework.org/schema/mvc 
+        http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd
+		http://www.springframework.org/schema/aop 
+		http://www.springframework.org/schema/aop/spring-aop-4.2.xsd"
+	default-lazy-init="true">
+
+	<!-- 启用基于注解的（映射实现）控制器类 -->
+	<mvc:annotation-driven>
+		<mvc:message-converters register-defaults="true">
+			<!-- 避免IE执行AJAX时,返回JSON出现下载文件 -->
+			<bean id="fastJsonHttpMessageConverter"
+				class="com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter">
+				<property name="supportedMediaTypes">
+					<list>
+						<!-- <value>text/html;charset=UTF-8</value> <value>text/json;charset=UTF-8</value> -->
+						<value>application/json;charset=UTF-8</value>
+					</list>
+				</property>
+				<!--<property name="serializerFeature"> -->
+				<!--这个地方加上这个功能吧，能自己配置一些东西，比如时间的格式化，null输出""等等 -->
+				<!--</property> -->
+				<property name="dateFormat" value="yyyy-MM-dd HH:mm:ss" />
+				<property name="charset" value="UTF-8" />
+			</bean>
+		</mvc:message-converters>
+	</mvc:annotation-driven>
+
+	<!-- 配置自动扫描 -->
+	<context:component-scan base-package="com.qtzk.system.controller">
+		<context:include-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" />
+		<context:include-filter type="annotation"
+			expression="org.springframework.web.bind.annotation.ControllerAdvice" />
+	</context:component-scan>
+
+
+	<!-- 启动对@AspectJ注解的支持 -->
+	<!--通知spring使用cglib而不是jdk的来生成代理方法 AOP可以拦截到Controller -->
+	<aop:aspectj-autoproxy proxy-target-class="true" />
+	<aop:aspectj-autoproxy proxy-target-class="true"></aop:aspectj-autoproxy>
+
+	<!-- 对模型视图名称的解析，即在模型视图名称添加前后缀 -->
+	<bean
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="viewClass"
+			value="org.springframework.web.servlet.view.JstlView" />
+		<property name="prefix" value="/WEB-INF/views/"></property>
+		<property name="suffix" value=".jsp"></property>
+	</bean>
+
+	<mvc:resources location="/statics/*" mapping="/statics/"></mvc:resources>
+
+	<mvc:default-servlet-handler />
+
+	<!-- 默认访问跳转到登录页面(即定义无需Controller的url<->view直接映射) -->
+	<!-- <mvc:view-controller path="/" view-name="forward:/login.jsp"/> -->
+
+	<!-- 配置文件上传，如果没有使用文件上传可以不用配置，当然如果不配，那么配置文件中也不必引入上传组件包 -->
+	<bean id="multipartResolver"
+		class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+		<!-- 默认编码 -->
+		<property name="defaultEncoding" value="utf-8" />
+		<!-- 文件大小最大值 -->
+		<property name="maxUploadSize" value="10485760000" />
+		<!-- 内存中的最大值 -->
+		<property name="maxInMemorySize" value="40960" />
+	</bean>
+
+	<!-- SpringMVC在超出上传文件限制时，会抛出org.springframework.web.multipart.MaxUploadSizeExceededException -->
+	<!-- 该异常是SpringMVC在检查上传的文件信息时抛出来的，而且此时还没有进入到Controller方法中 -->
+	<bean
+		class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+		<property name="exceptionMappings">
+			<props>
+				<!-- 遇到MaxUploadSizeExceededException异常时，自动跳转到/WEB-INF/error_fileupload.jsp页面 -->
+				<prop
+					key="org.springframework.web.multipart.MaxUploadSizeExceededException">WEB-INF/error_fileupload</prop>
+				<!-- 处理其它异常(包括Controller抛出的) -->
+				<!-- <prop key="java.lang.Throwable">WEB-INF/500</prop> -->
+			</props>
+		</property>
+	</bean>
+</beans>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="CardMapper">
+
+	<sql id="card-master">kcqb_card_storage_master </sql>
+	<sql id="card-detail">kcqb_card_storage_detail </sql>
+	<sql id="card-receive">kcqb_card_receive</sql>
+	<sql id="shop_info">kcqb_shop_info</sql>
+	<sql id="shop-employee">kcqb_shop_employee</sql>
+	
+	<sql id="base_column">
+		*
+	</sql>
+	
+	<!-- 翻页查询空卡列表 -->
+  	<select id="getBlankCardListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		id, batch_start, batch_end, state, created_at, remain_num
+    	FROM
+    		<include refid="card-master"/>
+    	<where> 
+    		1 = 1
+    		<if test="pd.cardCode != null and pd.cardCode != ''">
+    			AND (batch_start &lt;= #{pd.cardCode} AND batch_end &gt;= #{pd.cardCode})
+    		</if>
+    		<if test="pd.beginDate != null and pd.beginDate != ''"> AND created_at &gt;= #{pd.beginDate}</if>
+    		<if test="pd.endDate != null and pd.endDate != ''"> AND created_at &lt;= ADDDATE(#{pd.endDate}, INTERVAL 1 DAY)</if>
+    	</where>
+  	</select>
+	
+	<!-- 插入主表 -->
+	<insert id="saveMaster" parameterType="pd" keyProperty="id" useGeneratedKeys="true">
+		INSERT INTO <include refid="card-master"/>  (
+			batch_start,batch_end,state,manager_id,total_num,remain_num,created_at
+		) VALUES ( 
+			#{batch_start},#{batch_end},#{state},#{manager_id},#{total_num},#{remain_num},NOW()
+		)
+	</insert>
+	
+	<!-- 批量生成子表数据 -->
+	<insert id="batchSaveDetail" parameterType="pd">
+		INSERT INTO <include refid="card-detail"/>  (
+			master_id,card_code,card_key,state,created_at
+		) VALUES 
+		<foreach collection="detailPdArr" item="detailPd" separator=",">
+			(#{detailPd.master_id},#{detailPd.card_code},#{detailPd.card_key},0,NOW())
+		</foreach>
+	</insert>
+	
+	<!-- 更新主表 -->
+	<update id="updateMaster" parameterType="pd">
+		UPDATE
+			<include refid="card-master"/>
+		<set>
+			<if test="state != null and state != ''">state = #{state},</if>
+			<!-- 作废卡片时使用 -->
+			<if test="remain_num != null and remain_num != ''">remain_num = remain_num - #{remain_num},</if>
+			
+			<if test="storage_manager_id != null and storage_manager_id != ''">storage_manager_id = #{storage_manager_id},</if>
+			<if test="storage_at != null and storage_at != ''">storage_at = NOW(),</if>
+		</set>			
+		<where>
+			id = #{masterId} 
+		</where>
+	</update>
+	
+	<!-- 从表数据入库 -->
+	<update id="updateDetail" parameterType="pd">
+		UPDATE
+			<include refid="card-detail"/>
+		<set>
+			<if test="state != null and state != ''"> state = #{state},</if>
+			<if test="storage_at != null and storage_at != ''">storage_at = NOW(),</if>
+		</set>
+		<where>
+			<if test="masterId != null and masterId != ''"> AND master_id = #{masterId}</if>
+			<!-- 作废卡片时使用 -->
+			<if test="cardCode != null and cardCode != ''"> AND card_code = #{cardCode}</if>
+		</where>
+	</update>
+	
+	<!-- 根据批次id获取其下所有会员卡信息 -->
+	<select id="getCardDetailListByMasterId" parameterType="string" resultType="pd">
+		SELECT
+			id,card_code,card_key
+		FROM
+			<include refid="card-detail"/>
+		WHERE
+			master_id = #{masterId}
+	</select>
+	
+	<!-- 根据卡号获取会员卡信息 -->
+	<select id="getCardInfoByCardCode" parameterType="string" resultType="pd">
+		SELECT 
+			id,master_id masterId,state
+		FROM
+			<include refid="card-detail"/>
+		WHERE
+			card_code = #{cardCode}
+	</select>
+	
+	<!-- 获取已领取会员卡列表 -->
+	<select id="getReceiveCardListPage" parameterType="pd" resultType="pd">
+		SELECT
+			batch_start,batch_end,receive_start,receive_end,receive_at,receive_num,
+			b.name shopName, d.name shopEmployeeName, d.mobile shopEmployeeMobile
+		FROM
+			<include refid="card-receive"/> a, <include refid="shop_info"/> b, <include refid="card-master"/> c, <include refid="shop-employee"/> d
+		<where> 
+    		a.shop_id = b.id AND a.master_id = c.id AND a.employee_id = d.id
+    		<if test="pd.cardCode != null and pd.cardCode != ''">
+    			AND (receive_start &lt;= #{pd.cardCode} AND receive_end &gt;= #{pd.cardCode})
+    		</if>
+    		<if test="pd.shopName != null and pd.shopName != ''">
+    			AND b.name LIKE CONCAT('%',#{pd.shopName},'%')
+    		</if>
+    		<if test="pd.beginDate != null and pd.beginDate != ''"> AND receive_at &gt;= #{pd.beginDate}</if>
+    		<if test="pd.endDate != null and pd.endDate != ''"> AND receive_at &lt;= ADDDATE(#{pd.endDate}, INTERVAL 1 DAY)</if>
+    		<if test="pd.masterId != null and pd.masterId != '' and pd.masterId != '0'"> AND a.master_id = #{pd.masterId}</if>
+    	</where>
+    	ORDER BY receive_at DESC
+	</select>
+	
+	<!-- 获取可用批次列表 -->
+  	<select id="getEligibleBatchList" parameterType="string" resultType="pd">
+    	SELECT 
+    		id, batch_start batchStart, batch_end batchEnd
+    	FROM
+    		<include refid="card-master"/>
+    	<where> 
+    		state = 1
+    		<if test="remain_num != null and remain_num != ''"> AND remain_num &gt; 0</if>
+    	</where>
+  	</select>
+  	
+  	<!-- 校验领取卡号段信息 -->
+	<select id="cardReceiveCheck" parameterType="pd" resultType="pd">
+		SELECT
+			SUM(1) totalNum,
+			SUM((CASE WHEN state = -1 THEN 1 ELSE 0 END)) cancelNum,
+			SUM((CASE WHEN state = 2 THEN 1 ELSE 0 END)) receiveNum
+		FROM
+			<include refid="card-detail"/>
+		WHERE
+			master_id = #{masterId} AND card_code &gt;= #{receiveStart} AND card_code &lt;= #{receiveEnd} 
+	</select>
+  	<!-- 校验新卡号段信息 -->
+	<select id="cardNewCheck" parameterType="pd" resultType="pd">
+		SELECT
+			SUM(1) totalNum,
+			SUM((CASE WHEN state = -1 THEN 1 ELSE 0 END)) cancelNum,
+			SUM((CASE WHEN state = 2 THEN 1 ELSE 0 END)) receiveNum
+		FROM
+			<include refid="card-detail"/>
+		WHERE
+			card_code &gt;= #{receiveStart} AND card_code &lt;= #{receiveEnd} 
+	</select>
+  	
+  	<!-- 会员卡领取批次 -->
+  	<insert id="saveCardReceive" parameterType="pd">
+  		INSERT INTO <include refid="card-receive"/>
+  			(master_id,receive_start,receive_end,receive_num,cancel_num,receive_at,shop_id,employee_id,daq_user_id)
+  		VALUES
+  			(#{masterId},#{receiveStart},#{receiveEnd},#{receiveNum},#{cancelNum},NOW(),#{shopId},#{employeeId},#{daqUserId})
+  	</insert>
+  	
+  	<!-- 会员卡领取 -->
+	<update id="cardReceiveDetail" parameterType="pd">
+		UPDATE
+			<include refid="card-detail"/>
+		<set>
+			state = 2,
+			receive_at = NOW(),
+			shop_id = #{shopId},
+			employee_id = #{employeeId},
+			daq_user_id = #{daqUserId}
+		</set>
+		<where>
+			master_id = #{masterId} AND state = 1 AND card_code &gt;= #{receiveStart} AND card_code &lt;= #{receiveEnd}
+		</where>
+	</update>
+	
+	
+</mapper>

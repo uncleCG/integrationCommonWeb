@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ShopEmployeeMapper">
+
+	<sql id="shop-employee"> kcqb_shop_employee </sql>
+	<sql id="shop-bill"> kcqb_shop_bill </sql>
+	<sql id="shop-info"> kcqb_shop_info </sql>
+	<sql id="account-card-relationship"> kcqb_account_card_relationship </sql>
+	
+	<sql id="base-column">
+		a.id id,a.mobile mobile,a.name name,a.head_image head_image,a.state state,a.is_owner is_owner
+	</sql>
+	
+	<!-- 查询 -->
+  	<select id="getEmployeeByListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		<include refid="base-column"/>, DATE_FORMAT(a.created_at,'%Y-%m-%d %H:%i') created_at,
+    		(SELECT count(c.id) FROM <include refid="account-card-relationship"/> c WHERE c.employee_id = a.id AND c.shop_id = #{pd.shopId}) cardNum
+    	FROM 
+    		<include refid="shop-employee"/> a,<include refid="shop-info"/> b
+    	WHERE
+    		b.id = #{pd.shopId}
+			AND (
+				b.id = a.shop_id
+				OR b.shopkeeper_id = a.id
+			)
+  	</select>
+  	
+  	<!-- 根据员工id获取员工在签约页面需要展示的信息（编辑合约时使用） -->
+	<select id="getDetailById" parameterType="string" resultType="pd">
+		SELECT 
+			shop_id,mobile,name,idcard,idcard_img1,idcard_img2,
+			(SELECT count(id) FROM <include refid="shop-info"/> WHERE shopkeeper_id = <include refid="shop-employee"/>.id) shopNum,
+			(SELECT name FROM <include refid="shop-info"/> WHERE <include refid="shop-info"/>.id = <include refid="shop-employee"/>.shop_id) firstShopName
+		FROM 
+			<include refid="shop-employee"/> 
+		WHERE 
+			id = #{employeeId}
+	</select>
+	
+	<!-- 获取员工表中的所有管理员信息（关联管理人时使用） -->
+	<select id="getShopkeeperByListPage" parameterType="page" resultType="pd">
+		SELECT 
+			id,shop_id,mobile,name,idcard,idcard_img1,idcard_img2,
+			(SELECT count(id) FROM <include refid="shop-info"/> WHERE shopkeeper_id = <include refid="shop-employee"/>.id) shopNum,
+			(SELECT name FROM <include refid="shop-info"/> WHERE <include refid="shop-info"/>.id = <include refid="shop-employee"/>.shop_id) fisrtShopName
+		FROM 
+			<include refid="shop-employee"/>
+		<where>
+			is_owner = 1
+			<if test="pd.name != null and pd.name != ''"> AND name LIKE CONCAT(CONCAT('%',#{pd.name}),'%')</if>
+			<if test="pd.mobile != null and pd.mobile != ''"> AND mobile LIKE CONCAT(CONCAT('%',#{pd.mobile}),'%')</if>
+			<if test="pd.idcard != null and pd.idcard != ''"> AND idcard LIKE CONCAT(CONCAT('%',#{pd.idcard}),'%')</if>
+		</where>
+	</select>
+	
+	<!-- 获取手机号存在的记录数 -->
+  	<select id="getMobileNum" parameterType="string" resultType="pd">
+  		SELECT id,count(id) mobileNum FROM <include refid="shop-employee"/> WHERE mobile = #{nowMobile}
+  	</select>
+	
+	<!-- 获取商户员工列表 -->
+  	<select id="getEmployeeListPage" parameterType="page" resultType="pd">
+  		SELECT
+  			a.id employeeId,a.name employeeName,a.mobile employeeMobile,
+ 			b.id shopId,b.name shopName,b.province province,b.city city,b.district district
+  		FROM
+  			<include refid="shop-employee"/> a, <include refid="shop-info"/> b
+  		<where>
+  			(a.id = b.shopkeeper_id OR a.shop_id = b.id) AND b.state = 1 AND a.state = 1
+  			<if test="pd.shopName != null and pd.shopName !=''"> AND b.name LIKE CONCAT('%',#{pd.shopName},'%')</if>
+  			<if test="pd.shopCode != null and pd.shopCode !=''"> AND b.code LIKE CONCAT('%',#{pd.shopCode},'%')</if>
+  		</where>
+  	</select>
+  	
+  	<!-- 插入 -->
+	<insert id="insert-employee" parameterType="pd" keyProperty="id" useGeneratedKeys="true">
+		INSERT INTO <include refid="shop-employee"/>  (
+			name,mobile,head_image,state,is_owner,created_at,shop_id,updated_at,idcard,idcard_img1,idcard_img2
+		) VALUES ( 
+			#{name},#{mobile},#{head_image},#{state},#{is_owner},NOW(),#{shop_id},NOW(),#{idcard},#{idcard_img1},#{idcard_img2}
+		)
+	</insert>
+	
+	<!-- 修改员工信息 -->
+	<update id="updateEmployee" parameterType="pd">
+		UPDATE 
+			<include refid="shop-employee"/>
+		<set>
+			updated_at = NOW(),
+			<if test="name != null and name != ''">
+				name = #{name},
+			</if>
+			<if test="mobile != null and mobile != ''">
+				mobile = #{mobile},
+			</if>
+			<if test="state != null and state != ''">
+				state = #{state},
+			</if>
+			<if test="head_image != null and head_image != ''">
+				head_image = #{head_image},
+			</if>
+			<if test="shop_id != null and shop_id != '' and shop_id==0 ">
+				shop_id = null,
+			</if>
+			<if test="shop_id != null and shop_id != '' and shop_id!=0 ">
+				shop_id = #{shop_id},
+			</if>
+			<if test="idcard != null and idcard != ''">
+				idcard = #{idcard},
+			</if>
+			<if test="idcard_img1 != null and idcard_img1 != ''">
+				idcard_img1 = #{idcard_img1},
+			</if>
+			<if test="idcard_img2 != null and idcard_img2 != ''">
+				idcard_img2 = #{idcard_img2},
+			</if>
+		</set>
+		<where>
+			id = #{id} 
+		</where>
+	</update>
+	
+	<!-- 分页获取卖家数据列表 -->
+  	<select id="getSellerListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		id,mobile,name,is_owner,state, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') created_at,shop_id,
+    		(CASE WHEN se.is_owner=1 THEN (SELECT COUNT(1) FROM <include refid="shop-info"/> a WHERE a.shopkeeper_id = se.id ) else 1 END) AS shopsnum,
+    		(SELECT COUNT(id) FROM <include refid="account-card-relationship"/> WHERE employee_id = se.id) cardNum 
+    	FROM
+    		<include refid="shop-employee"/> se 
+    	<where>
+    		1 = 1
+    		<if test="pd.name != null and pd.name != ''"> AND se.name LIKE CONCAT(CONCAT('%',#{pd.name}),'%')</if>
+			<if test="pd.mobile != null and pd.mobile != ''"> AND se.mobile LIKE CONCAT(CONCAT('%', #{pd.mobile}), '%')</if>
+			<if test="pd.is_owner != null and pd.is_owner != '' and pd.is_owner != -1"> AND se.is_owner= #{pd.is_owner}</if>
+			<if test="pd.state != null and pd.state != '' and pd.state !=-1"> AND se.state= #{pd.state}</if>  
+    	</where> 
+    		ORDER BY se.created_at DESC 
+  	</select>
+	
+	<!-- 根据id查询详细信息 -->
+  	<select id="getById" parameterType="string" resultType="pd">
+    	SELECT 
+    		se.*,
+    		(SELECT si.name FROM <include refid="shop-info"/> si WHERE se.shop_id=si.id) AS shop_name,
+    		(SELECT si.code FROM <include refid="shop-info"/> si WHERE se.shop_id=si.id) AS shop_code 
+    	FROM 
+    		<include refid="shop-employee"/> se
+    	WHERE 
+    		se.id = #{id}
+  	</select>
+  	
+  	<!-- 更新管理人首家店 -->
+  	<update id="changeFisrtShop" parameterType="string">
+  		UPDATE 
+  			<include refid="shop-employee"/>
+		SET 
+			shop_id = (
+			SELECT
+				MIN(id) id
+			FROM
+				<include refid="shop-info"/>
+			WHERE
+				shopkeeper_id = #{shopkeeperId}
+		)
+		WHERE
+			id = #{shopkeeperId}
+  	</update>
+  	
+  	<!-- 清除商户员工token -->
+  	<update id="clearToken" parameterType="string">
+  		UPDATE
+  			<include refid="shop-employee"/>
+  		SET
+  			token = null
+  		WHERE 
+  			shop_id = #{shopId} or id in (select shopkeeper_id from <include refid="shop-info"/> si where si.id = #{shopId})
+  	</update>
+	
+</mapper>

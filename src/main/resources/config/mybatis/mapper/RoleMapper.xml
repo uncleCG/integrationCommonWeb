@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="RoleMapper">
+
+	<sql id="role"> kcqb_sys_role </sql>
+	
+	<resultMap id="beanMap" type="role">
+		<id column="id" property="id" />
+		<result column="name" property="name" />
+		<result column="description" property="description"/>
+		<result column="created_at" property="createdAt"/>
+		<result column="updated_at" property="updatedAt"/>
+	</resultMap>
+	
+	<!-- 插入 -->
+	<insert id="insert" parameterType="role" keyProperty="id" useGeneratedKeys="true">
+		INSERT INTO <include refid="role"/>  (
+			name,created_at
+		) VALUES ( 
+			#{name},NOW()
+		)
+	</insert>
+	
+	<!-- 更新 -->
+	<update id="update" parameterType="role">
+		UPDATE
+			 <include refid="role"/>
+		<set>			
+			name = #{name},
+		</set>
+		<where>
+			id = #{id} 
+		</where>
+	</update>
+	
+	<!-- 查询 -->
+  	<select id="getRoleById" parameterType="int" resultMap="beanMap">
+    	SELECT * FROM <include refid="role"/> WHERE id = #{id}
+  	</select>
+  	
+  	<!-- 
+  	<select id="findByName" parameterType="string" resultMap="beanMap">
+    	SELECT * FROM <include refid="role"/> WHERE name = #{name}
+  	</select>
+  	 -->
+  	<!-- 获取所有角色 -->
+  	<select id="findAllRole" parameterType="string" resultMap="beanMap">
+  		SELECT * FROM <include refid="role"/>
+  	</select>
+  	
+  	<!-- 动态组装复合查询条件 -->
+	<sql id="page_condition_sql">
+		<if test="pd.id != null and pd.id != ''"> AND id= #{pd.id}</if>
+		<if test="pd.name != null and pd.name != ''"> AND name= #{pd.name}</if>
+	</sql>
+	
+  	<select id="findByListPage" parameterType="page" resultMap="beanMap">
+    	SELECT * FROM <include refid="role"/>
+  	</select>
+  	
+  	<!-- 根据id删除 add by JHONNY -->
+  	<delete id="delRoleById" parameterType="Integer" flushCache="true">
+  		DELETE FROM <include refid="role"/> <where> id = #{roleId} </where>
+  	</delete>
+  	
+</mapper>

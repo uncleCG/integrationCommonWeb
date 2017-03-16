@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans  
+    http://www.springframework.org/schema/beans/spring-beans-3.0.xsd   
+    http://www.springframework.org/schema/context   
+    http://www.springframework.org/schema/context/spring-context-3.0.xsd
+    http://www.springframework.org/schema/util 
+    http://www.springframework.org/schema/util/spring-util.xsd"
+	default-lazy-init="true">
+
+	<description>Shiro安全配置</description>
+	
+	<!-- 配置shiro的过滤器工厂类，id- shiroFilter要和我们在web.xml中配置的过滤器一致 -->
+	<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+		<!-- Shiro的核心安全接口,这个属性是必须的 -->
+		<property name="securityManager" ref="securityManager" />
+		<!-- 要求登录时的链接，非必须的属性，默认会自动寻找Web工程根目录下的"/login.jsp"页面 -->
+		<property name="loginUrl" value="/login.shtml" />
+		<!-- 登录成功后要跳转的连接 -->
+		<property name="successUrl" value="/index.shtml" />
+		<!-- 用户访问未对其授权的资源时，所显示的连接 -->
+		<property name="unauthorizedUrl" value="/permissionRefuse" />
+		<!-- 自定义权限配置：url 过滤在这里做 -->
+		<property name="filterChainDefinitions">
+			<!-- 参考：http://blog.csdn.net/jadyer/article/details/12172839 -->
+			<!-- 
+				Shiro验证URL时,URL匹配成功便不再继续匹配查找(所以要注意配置文件中的URL顺序,尤其在使用通配符时)故filterChainDefinitions的配置顺序为自上而下,以最上面的为准 
+			-->
+            <value>
+				<!-- Pattern里用到的是两颗星，这样才能实现任意层次的全匹配 -->
+				/statics/** = anon 
+				/login.shtml = anon
+				/getCheckCode = anon
+				<!-- 表示用户必需已通过认证，并拥有 superman 角色 && superman:role:list 权限才可以正常发起'/roleController'请求-->
+				/roleController/** = authc,roles[superman],perms[superman:role:list]
+				/rightController/** = authc,roles[superman],perms[superman:right:list]
+				/managerController/preEditPwd = authc
+				/managerController/editUserBase = authc
+				<!-- 表示用户必需已通过认证,并拥有 superman 角色 && superman:manager:list 才可以正常发起'/managerController'请求 -->
+				/managerController/** = authc,roles[superman],perms[superman:manager:list]
+				/downloadController/qrcodeDownload = authc
+			</value>
+        </property>
+	</bean>
+	
+	<!-- 凭证匹配器 -->
+	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+		<property name="realm" ref="myRealm" />
+	</bean>
+	
+	<!--自定义Realm -->
+	<bean id="myRealm" class="com.qtzk.system.shiro.MyRealm"/>
+	
+	<bean id="cacheManager" class="org.apache.shiro.cache.MemoryConstrainedCacheManager"/>
+	
+	<!-- 保证实现了 Shiro 内部 lifecycle 函数的 bean 执行 -->
+	<bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor" />
+	
+	<!-- 开启Shiro的注解(如@RequiresRoles,@RequiresPermissions),需借助SpringAOP扫描使用Shiro注解的类,并在必要时进行安全逻辑验证 -->  
+	<!-- 配置以下两个bean即可实现此功能 -->  
+	<!-- Enable Shiro Annotations for Spring-configured beans. Only run after the lifecycleBeanProcessor has run -->  
+	<!-- 由于本例中并未使用Shiro注解,故注释掉这两个bean(个人觉得将权限通过注解的方式硬编码在程序中,查看起来不是很方便,没必要使用) -->  
+	<!--   
+	<bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" depends-on="lifecycleBeanPostProcessor"/>  
+	  <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">  
+	    <property name="securityManager" ref="securityManager"/>  
+	  </bean>  
+	-->
+</beans>

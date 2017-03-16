@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="AccountMapper">
+
+	<sql id="account">account</sql>
+	<sql id="account-link-card">kcqb_account_link_card</sql>
+	<sql id="account-card-relationship">kcqb_account_card_relationship</sql>
+	<sql id="shop-info">kcqb_shop_info</sql>
+	
+	<sql id="base_column">
+		*
+	</sql>
+	
+	<!-- 翻页查询已绑卡买家列表 -->
+  	<select id="getTieBuyerListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		b.id id, b.mobile mobile, a.first_recharge_at firstRechargeAt, a.first_consume_at firstConsumeAt,
+    		a.first_tie_at firstTieAt,a.recharge recharge, a.consume consume, a.balance balance, a.created_at createdAt,
+    		(SELECT count(id) FROM <include refid="account-card-relationship"/> WHERE account_id = b.id) cardNum
+    	FROM
+    		<include refid="account-link-card"/> a, <include refid="account"/> b
+    	<where>
+    		a.account_id = b.id
+    		<if test="pd.mobile != null and pd.mobile != ''"> AND b.mobile LIKE CONCAT('%',#{pd.mobile},'%')</if>
+    	</where>
+  	</select>
+  	
+  	<!-- 分页查询绑卡买家名下的会员卡列表 -->
+  	<select id="getMyCardListPage" parameterType="page" resultType="pd">
+  		SELECT
+  			id,card_code cardCode,created_at createdAt,first_recharge_at firstRechargeAt,
+  			balance,is_loss isLoss,is_freeze isFreeze,remark,
+  			(CASE WHEN pwd IS NULL OR pwd = '' THEN 0 ELSE 1 END) isPwd,
+  			(SELECT name FROM <include refid="shop-info"/> WHERE id = a.shop_id) shopName
+  		FROM
+  			<include refid="account-card-relationship"/> a
+  		WHERE
+  			account_id = #{pd.accountId}
+  	</select>
+  	
+  	<!-- 更新已开通的会员卡 -->
+  	<update id="updateCard" parameterType="pd">
+  		UPDATE
+  			<include refid="account-card-relationship"/>
+  		<set>
+  			<if test="isLoss != null and isLoss != ''">is_loss = #{isLoss},</if>
+  			<if test="isFreeze != null and isFreeze != ''">is_freeze = #{isFreeze},</if>
+  			<if test="pwd != null and pwd != ''">pwd = #{pwd},</if>
+  			<if test="remark != null and remark != ''">remark = #{remark}</if>
+  		</set>
+  		WHERE
+  			id = #{relateId}
+  	</update>
+  	
+  	<!-- 翻页查询未绑卡买家列表 -->
+  	<select id="getNoTieBuyerListPage" parameterType="page" resultType="pd">
+    	SELECT 
+    		a.id id, a.card_code cardCode, a.first_recharge_at firstRechargeAt,a.recharge recharge, a.consume consume,
+    		a.balance balance, a.is_loss isLoss, a.is_freeze isFreeze, a.created_at createdAt,
+    		(SELECT name FROM <include refid="shop-info"/> WHERE id = a.shop_id) shopName
+    	FROM
+    		<include refid="account-card-relationship"/> a
+    	<where>
+    		account_id IS NULL
+    		<if test="pd.cardCode != null and pd.cardCode != ''"> AND card_code LIKE CONCAT('%',#{pd.cardCode},'%')</if>
+    	</where>
+  	</select>
+	
+</mapper>
