@@ -7,13 +7,13 @@
 		<!-- jsp文件头和头部 -->
 		<%@ include file="common/_top.jsp"%> 
 		<link href="<%=path %>/statics/css/H-ui.login.css" rel="stylesheet" type="text/css" />
-		<title>卡车钱宝管理系统</title>
-		<meta name="keywords" content="擎天重卡,中国第一车联网、物联网,清洁能源,LNG,CNG">
-		<meta name="description" content="擎天重卡网打造中国第一车联网、物联网相结合的清洁能源产业服务平台。自产品上线一月内，用户数即达万人！随着业务的扩大，未来的用户数将会成几何数不断增长，是最具朝气的平台之一。">
+		<title>后台管理系统</title>
+		<meta name="keywords" content="后台管理系统">
+		<meta name="description" content="后台管理系统模版">
 	</head>
 <body onLoad="document.getElementById('username').focus();">
 <input type="hidden" id="TenantId" name="TenantId" value="" />
-<div class="header"><span>卡车钱宝管理系统</span></div>
+<div class="header"><span>后台管理系统</span></div>
 <div class="loginWraper">
   <div id="loginform" class="loginBox">
     <form class="form form-horizontal" action="login.shtml" onsubmit="return check()" method="post">

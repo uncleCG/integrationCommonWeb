@@ -1,7 +1,7 @@
 <%@ page language="java" import="java.util.*" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <header class="Hui-header cl"> 
-	<a class="Hui-logo l" title="港口服务管理系统" href="">卡车钱宝管理系统</a> <a class="Hui-logo-m l" href="" title="QT.admin">QT</a> <span class="Hui-subtitle l">V1.0</span>
+	<a class="Hui-logo l" title="管理系统" href="">后台管理系统</a> <a class="Hui-logo-m l" href="" title="QT.admin">QT</a> <span class="Hui-subtitle l">V1.0</span>
     <!--我要添加子菜单：开始-->
     <nav class="main_cld_nav cl nav" id="Hui-nav">
     	<ul>
